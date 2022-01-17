@@ -33,6 +33,10 @@
 
 #include "midi_host.h"
 
+
+//extern "C" {
+
+
 //--------------------------------------------------------------------+
 // MACRO CONSTANT TYPEDEF
 //--------------------------------------------------------------------+
@@ -72,7 +76,7 @@ typedef struct
   midi_stream_t stream_write;
   midi_stream_t stream_read;
 
-  /*------------- From this point, data is not cleared by bus reset -------------*/
+  //------------- From this point, data is not cleared by bus reset -------------
   // Endpoint FIFOs
   tu_fifo_t rx_ff;
   tu_fifo_t tx_ff;
@@ -351,6 +355,13 @@ bool midih_open(uint8_t rhport, uint8_t dev_addr, tusb_desc_interface_t const *d
     // Some devices always return exactly the request length so transfers won't complete
     // unless you assume every transfer is the last one.
     usbh_edpt_force_last_buffer(dev_addr, p_midi_host->ep_in, true);
+    // Some devices will always NAK the initial IN-ep transfer request and
+    // depending on your host hardware, this will cause hanging while retrying 
+    // the NAK'd IN transfer forever right after enumeration, before the mount
+    // callback is fired. Aborting the NAK'd transfer to allow other transfers 
+    // to happen on the one shared epx endpoint is needed to allow these devices 
+    // to finish mounting and be in a usable state after enumeration.
+    usbh_edpt_clear_in_on_nak(p_midi_host->dev_addr, p_midi_host->ep_in);
   }
   if (out_desc)
   {
@@ -715,3 +726,5 @@ uint32_t tuh_midi_stream_read (uint8_t dev_addr, uint8_t *p_cable_num, uint8_t *
   return bytes_buffered;
 }
 #endif
+
+//} // extern C
